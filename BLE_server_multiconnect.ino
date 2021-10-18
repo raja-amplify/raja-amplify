@@ -39,7 +39,7 @@ bool oldDeviceConnected = false;
 uint32_t value = 0;
 std::string Value ;
 int len = 0;
-int v =0;
+int v = 0;
 void assignValueChargingState();
 
 // See the following for generating UUIDs:
@@ -80,19 +80,19 @@ using std::stringstream;
 struct chargingStateCM
 {
   char sessionid[10] = "123456789";
-  uint8_t chargeStartStop;
-  uint16_t metervalue;
-  uint16_t metervoltage;
-  uint16_t metercurrent;
-  uint16_t error_code;
-  uint8_t chargingState;
+  int8_t chargeStartStop;
+  int16_t metervalue;
+  int16_t metervoltage;
+  int16_t metercurrent;
+  int16_t error_code;
+  int8_t chargingState;
 
 };
 
 chargingStateCM csCM;
 char responsechargingState[20];
-
-
+std::stringstream hexvals;
+std::string hexval;
 //#include "src/customBLE.h"
 void setup() {
   Serial.begin(115200);
@@ -113,14 +113,14 @@ void setup() {
   pCharacteristic1 = pService->createCharacteristic(
                        AVAILABILITY_CHARACTERISTIC_UUID,
                        BLECharacteristic::PROPERTY_READ   |
-                       //BLECharacteristic::PROPERTY_WRITE  |
+                       BLECharacteristic::PROPERTY_WRITE  |
                        BLECharacteristic::PROPERTY_NOTIFY |
                        BLECharacteristic::PROPERTY_INDICATE
                      );
 
   // Create a BLE Characteristic : to write transaction id
   pCharacteristic2 = pService->createCharacteristic(
-                       AVAILABILITY_CHARACTERISTIC_UUID,
+                       TID_CHARACTERISTIC_UUID,
                        BLECharacteristic::PROPERTY_READ   |
                        BLECharacteristic::PROPERTY_WRITE  |
                        BLECharacteristic::PROPERTY_NOTIFY |
@@ -128,9 +128,9 @@ void setup() {
                      );
   // Create a BLE Characteristic : to check meter values
   pCharacteristic3 = pService->createCharacteristic(
-                       AVAILABILITY_CHARACTERISTIC_UUID,
+                       METERVALUES_CHARACTERISTIC_UUID,
                        BLECharacteristic::PROPERTY_READ   |
-                       //BLECharacteristic::PROPERTY_WRITE  |
+                       BLECharacteristic::PROPERTY_WRITE  |
                        BLECharacteristic::PROPERTY_NOTIFY |
                        BLECharacteristic::PROPERTY_INDICATE
                      );
@@ -156,6 +156,10 @@ void setup() {
   pCharacteristic2->setValue((uint8_t*)&csCM, 20);
   pCharacteristic2->notify();
 
+
+  readCharac2();
+  //tidParser();
+  //meterParser();
   //int v = x2i("003C");
 
   //Serial.println(v);
@@ -196,74 +200,151 @@ void loop() {
     Value = pCharacteristic2->getValue();
     //pCharacteristic2->notify();
     //value++;
-   // Serial.print(F("value of the characteristic is:"));
-    //Serial.println(Value);
+    Serial.print(F("value of the characteristic is:"));
+    Serial.println(Value.c_str());
 
-    for (const auto &item : Value) {
-        cout << hex << int(item);
-    }
-    cout << endl;
-
-    
-    //len = Value.length();
-/*
-      if (Value.length() > 0) {
-       Serial.println("*********");
-       Serial.print("New value: ");
-       for (int i = 0; i < Value.length(); i++) {
-         Serial.print(Value[i]);
+    /*   for (const auto &item : Value) {
+        // hexval.clear();
+          //cout << hexval << hex << int(item);
+          cout << hex << int(item);
        }
-       Serial.println();
-       Serial.println("*********");
-       
+       cout << endl;*/
 
-  }*/
-  
- delay(10); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
-}
-// disconnecting
-if (!deviceConnected && oldDeviceConnected) {
-  delay(500); // give the bluetooth stack the chance to get things ready
-  pServer->startAdvertising(); // restart advertising
-  Serial.println(F("start advertising"));
-  oldDeviceConnected = deviceConnected;
-  cp_state = handshake;
-  pCharacteristic1->setValue((uint8_t*)&cp_state, 4);
-  pCharacteristic1->notify();
-  delay(10); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
-}
-// connecting
-if (deviceConnected && !oldDeviceConnected) {
-  // do stuff here on connecting
-  oldDeviceConnected = deviceConnected;
-}
+    //Serial.println(hexval.c_str());
 
 
+    //len = Value.length();
+    /*
+          if (Value.length() > 0) {
+           Serial.println("*********");
+           Serial.print("New value: ");
+           for (int i = 0; i < Value.length(); i++) {
+             Serial.print(Value[i]);
+           }
+           Serial.println();
+           Serial.println("*********");
+
+
+      }*/
+
+    delay(10); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
+  }
+  // disconnecting
+  if (!deviceConnected && oldDeviceConnected) {
+    delay(500); // give the bluetooth stack the chance to get things ready
+    pServer->startAdvertising(); // restart advertising
+    Serial.println(F("start advertising"));
+    oldDeviceConnected = deviceConnected;
+    cp_state = handshake;
+    pCharacteristic1->setValue((uint8_t*)&cp_state, 4);
+    pCharacteristic1->notify();
+    delay(10); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
+  }
+  // connecting
+  if (deviceConnected && !oldDeviceConnected) {
+    // do stuff here on connecting
+    oldDeviceConnected = deviceConnected;
+  }
+
+
+}
+
+void readCharac2()
+{
+
+  Value = pCharacteristic2->getValue();
+  Serial.print(F("Length is:"));
+  Serial.println(Value.length());
+  for (const auto &item : Value) {
+    hexval.clear();
+    hexvals << hex << int(item);
+    //cout << hex << int(item);
+  }
+  // cout << endl;
+  hexval = hexvals.str();
+  //Serial.println(hexval.c_str());
+  for (int i = 0 ; i < Value.length(); i++)
+  {
+    Serial.println(Value[i], HEX);
+  }
+
+int temp[2]; 
+int j=0;
+  // Reading the meter value
+
+  for (int i=11; i< 13;i++)
+    {
+    temp[j] = Value[i]; 
+    j++;
+    }
+Serial.println(F("Extracting meter values:"));
+
+/*for (int i=0;i<2;i++)
+{
+  Serial.println(temp[i]);
+}*/
+
+Serial.println(temp[0]<<8|temp[1]); //Decoding logic
+
+
+}
+
+void tidParser()
+{
+  char *ptr;
+  long ret;
+
+  Value = pCharacteristic2->getValue();
+  char str[Value.length()];
+
+  for (int i = 0; i < 10; i++)
+  {
+    str[i] = Value[i];
+  }
+
+  ret = strtoul(str, &ptr, 10); // Since the size of id is 10
+  Serial.println(ret);
+  Serial.println(ptr);
+
+
+
+}
+
+
+void meterParser()
+{
+  Value = pCharacteristic2->getValue();
+  unsigned int x;
+  std::stringstream ss;
+  ss << hex << Value;
+  ss >> x;
+  // output it as a signed type
+  std::cout << static_cast<int>(x) << std::endl;
 }
 
 void assignValueChargingState()
 {
   strcpy(csCM.sessionid, "sambar123");
-  csCM.chargeStartStop = 0;
+  csCM.chargeStartStop = 1;
   csCM.metervalue = 123;
   csCM.metervoltage = 456;
-  csCM.metercurrent = 789;
-  csCM.error_code = 1;
+  csCM.metercurrent = 0x0315;
+  csCM.error_code = 0x01;
   csCM.chargingState = 5;
 }
 
-int x2i(char *s) 
+int x2i(char *s)
 {
   int x = 0;
-  for(;;) {
+  for (;;) {
     char c = *s;
     if (c >= '0' && c <= '9') {
       x *= 16;
-      x += c - '0'; 
+      x += c - '0';
     }
     else if (c >= 'A' && c <= 'F') {
       x *= 16;
-      x += (c - 'A') + 10; 
+      x += (c - 'A') + 10;
     }
     else break;
     s++;
